@@ -1,9 +1,10 @@
 ﻿using NFL_ELO;
 using System.Data;
+using Spectre.Console;
 
 internal class Program
 {
-    private static double playoffKFactor = 64;
+    private static double playoffKFactor = 128;
     private static double regularSeasonKFactor = 32;
 
     private static void Main(string[] args)
@@ -13,12 +14,18 @@ internal class Program
         var seasons = manager.GetDistinctValues(manager.Table, "season");
         foreach (var season in seasons)
         {
-            Console.WriteLine($"Printing Data for {season} Season");
+            AnsiConsole.WriteLine($"Printing Data for {season} Season");
             DataRow[] seasonRows = manager.Table.Select($"season = '{season}'");
             var distinctGameweeks = manager.GetDistinctValues(seasonRows.CopyToDataTable(), "week");
             foreach (var week in distinctGameweeks)
             {
-                Console.WriteLine($"Printing Data for week {week}");
+                var table = new DataTable();
+                table.Columns.Add("Team");
+                table.Columns.Add("ELO");
+                table.Columns.Add("ELO Change");
+
+                //table.AddColumns("Team", "ELO", "ELO Change");
+                AnsiConsole.WriteLine($"Printing Data for week {week}");
                 DataRow[] gameweekRows = seasonRows.Where(row => row["week"].ToString() == week).ToArray();
                 foreach (var row in gameweekRows)
                 {
@@ -34,9 +41,40 @@ internal class Program
                     int awayELOOld = away.ELO;
 
                     CalculateELO(home, homeScore, away, awayScore, int.TryParse(row.ToString(), out _));
-                    Console.WriteLine($"Team : {home.LongName} ELO : {home.ELO} Change : {homeELOOld - home.ELO}");
-                    Console.WriteLine($"Team : {away.LongName} ELO : {away.ELO} Change : {awayELOOld - away.ELO}");
+                    table.Rows.Add(new string[] { home.LongName, home.ELO.ToString(), (home.ELO - homeELOOld).ToString() });
+                    table.Rows.Add(new string[] { away.LongName, away.ELO.ToString(), (away.ELO - awayELOOld).ToString() });
+                    //table.AddRow(new string[] {home.LongName, home.ELO.ToString(), (home.ELO-homeELOOld).ToString() });
+                    //table.AddRow(new string[] { away.LongName, away.ELO.ToString(), (away.ELO - awayELOOld).ToString() });
+                }
+                
 
+                DataTable sortedTable = new DataTable();
+                sortedTable.Columns.Add("Team");
+                sortedTable.Columns.Add("ELO");
+                sortedTable.Columns.Add("ELO Change");
+
+                while (table.Rows.Count > 0)
+                {
+                    int highestELO = 0;
+                    int highestELOIndex = -1;
+                    foreach (DataRow dataRow in table.Rows)
+                    {
+
+                        Int32.TryParse((string?)dataRow.ItemArray[1], out int currELO);
+                        if (currELO > highestELO)
+                        {
+                            highestELO = currELO;
+                            highestELOIndex = table.Rows.IndexOf(dataRow);
+                        }
+                    }
+                    sortedTable.ImportRow(table.Rows[highestELOIndex]);
+                    table.Rows.RemoveAt(highestELOIndex);
+                }
+
+                foreach (DataRow dataRow in sortedTable.Rows)
+                {
+                    Console.WriteLine($"{dataRow[0]} {dataRow[1]} {dataRow[2]}");
+                    //AnsiConsole.Write(table);
                 }
             }
         }
